@@ -2,9 +2,32 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import os
+import pandas as pd
 
-# Define neural network
+# Load dataset
+file_path = "Mental Health Data.csv"  # Update path if needed
+df = pd.read_csv(file_path)
+
+# Map categorical values to binary
+binary_mapping = {"Yes": 1, "No": 0, "Maybe": 0}  
+df["Target"] = df["Would you feel comfortable discussing a mental health disorder with your coworkers?"].map(binary_mapping)
+df["Feature1"] = df["Does your employer provide mental health benefits as part of healthcare coverage?"].map(binary_mapping)
+df["Feature2"] = df["Has your employer ever formally discussed mental health (for example, as part of a wellness campaign or other official communication)?"].map(binary_mapping)
+df["Feature3"] = df["Do you have a family history of mental illness?"].map(binary_mapping)
+df["Feature4"] = df["Have you ever sought treatment for a mental health issue from a mental health professional?"].map(binary_mapping)
+
+# Drop missing values
+df = df.dropna(subset=["Target", "Feature1", "Feature2", "Feature3", "Feature4"])
+
+# Split data
+X = df[["Feature1", "Feature2", "Feature3", "Feature4"]].values
+y = df["Target"].values
+
+# Convert to tensors
+X_tensor = torch.tensor(X, dtype=torch.float32)
+y_tensor = torch.tensor(y, dtype=torch.long)
+
+# Define model
 class MentalHealthNet(nn.Module):
     def __init__(self, input_size, num_classes):
         super(MentalHealthNet, self).__init__()
@@ -18,47 +41,24 @@ class MentalHealthNet(nn.Module):
         x = self.relu(self.fc2(x))
         return self.fc3(x)
 
-# Train model
-def train_model():
-    # Generate synthetic dataset (replace with real data)
-    np.random.seed(42)
-    num_samples = 500
-    num_features = 4
-    X_train = np.random.rand(num_samples, num_features)
-    y_train = np.random.randint(0, 2, size=(num_samples,))
+# Initialize and train model
+input_size = 4
+num_classes = 2
+model = MentalHealthNet(input_size, num_classes)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.01)
 
-    # Convert to tensors
-    X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-    y_train_tensor = torch.tensor(y_train, dtype=torch.long)
+# Training loop
+epochs = 100
+for epoch in range(epochs):
+    optimizer.zero_grad()
+    outputs = model(X_tensor)
+    loss = criterion(outputs, y_tensor)
+    loss.backward()
+    optimizer.step()
+    if (epoch + 1) % 10 == 0:
+        print(f"Epoch [{epoch + 1}/{epochs}], Loss: {loss.item():.4f}")
 
-    # Initialize model
-    input_size = num_features
-    num_classes = 2
-    model = MentalHealthNet(input_size, num_classes)
-
-    # Define loss and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
-
-    # Train model
-    epochs = 100
-    for epoch in range(epochs):
-        optimizer.zero_grad()
-        outputs = model(X_train_tensor)
-        loss = criterion(outputs, y_train_tensor)
-        loss.backward()
-        optimizer.step()
-
-        if (epoch + 1) % 10 == 0:
-            print(f'Epoch [{epoch + 1}/{epochs}], Loss: {loss.item():.4f}')
-
-    # Create model directory if not exists
-    os.makedirs("model", exist_ok=True)
-
-    # Save trained model
-    torch.save(model.state_dict(), "model/mental_health_model.pth")
-    print("Model training complete and saved.")
-
-# Run training
-if __name__ == "__main__":
-    train_model()
+# Save model
+torch.save(model.state_dict(), "mental_health_model.pth")
+print("Model training complete. Saved as 'mental_health_model.pth'.")
